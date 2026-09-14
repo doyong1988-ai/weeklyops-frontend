@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 function hexToTint(hex, alpha) {
   const safe = /^#?[0-9a-fA-F]{6}$/.test(hex) ? hex.replace('#', '') : '94A3B8';
   const n = parseInt(safe, 16);
@@ -9,53 +7,46 @@ function hexToTint(hex, alpha) {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function DayCard({ day }) {
+function DayCard({ day, onClick }) {
+  const slots = Array.isArray(day.slots) ? day.slots : [];
   return (
-    <div className="rounded-lg border border-surface-200 bg-white p-3">
-      <div className="flex items-center justify-between mb-1">
+    <button
+      onClick={onClick}
+      className="text-left rounded-lg border border-surface-200 bg-white p-3 hover:border-primary-300 hover:shadow-sm transition-all"
+      title="클릭 시 상세보기 (읽기전용)"
+    >
+      <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-bold text-navy-900">
           {day.day ?? '-'} {day.date ?? ''}
         </span>
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-100">{day.progress ?? 0}%</span>
       </div>
-      <p className="text-[11px] text-navy-500 leading-snug">{day.summary || '-'}</p>
-    </div>
+      {slots.length === 0 ? (
+        <p className="text-[11px] text-navy-400">작성된 업무가 없습니다</p>
+      ) : (
+        <div className="space-y-1">
+          {slots.map((s, i) => (
+            <div key={i}>
+              <p className="text-[10px] font-semibold text-primary-600">
+                {s.startTime}~{s.endTime}
+              </p>
+              <p className="text-[11px] text-navy-500 leading-snug">{s.summary || '-'}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[9px] font-semibold text-primary-500 mt-1.5">🔍 클릭 시 상세보기(읽기전용)</p>
+    </button>
   );
 }
 
-const FEEDBACK_LABEL = {
-  approved: { text: '✓ 승인됨', className: 'bg-emerald-100 text-emerald-700' },
-  feedback_requested: { text: '피드백 요청됨', className: 'bg-amber-100 text-amber-700' },
-  pending: { text: '검토 대기', className: 'bg-surface-200 text-navy-500' },
-};
-
-export default function WeeklyTimelineCard({ project, onApprove, onRequestFeedback }) {
-  const [busy, setBusy] = useState(false);
-
+export default function WeeklyTimelineCard({ project, onOpenDay }) {
   if (!project) return null; // defensive: never render on a missing project object
 
   const days = Array.isArray(project.days) ? project.days : [];
   const share = project.share ?? 0;
   const overall = project.overall ?? 0;
   const colorHex = /^#?[0-9a-fA-F]{6}$/.test(project.colorHex) ? project.colorHex : '#475569';
-  const feedbackMeta = FEEDBACK_LABEL[project.feedbackStatus] ?? FEEDBACK_LABEL.pending;
-  const isApproved = project.feedbackStatus === 'approved';
-
-  async function handleApprove() {
-    if (!onApprove || busy || !project.weeklySummaryId) return;
-    setBusy(true);
-    await onApprove(project.weeklySummaryId);
-    setBusy(false);
-  }
-
-  async function handleRequestFeedback() {
-    if (!onRequestFeedback || busy || !project.weeklySummaryId) return;
-    const comment = window.prompt('어떤 부분에 대한 피드백인가요?');
-    if (!comment) return;
-    setBusy(true);
-    await onRequestFeedback(project.weeklySummaryId, comment);
-    setBusy(false);
-  }
 
   return (
     <div className="rounded-xl bg-surface-100 p-4 space-y-3">
@@ -76,9 +67,6 @@ export default function WeeklyTimelineCard({ project, onApprove, onRequestFeedba
           </div>
           <span className="text-xs font-bold">{overall}%</span>
         </div>
-        <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0 ${feedbackMeta.className}`}>
-          {feedbackMeta.text}
-        </span>
       </div>
 
       <div className="rounded-lg bg-white border border-surface-200 p-3">
@@ -86,11 +74,6 @@ export default function WeeklyTimelineCard({ project, onApprove, onRequestFeedba
         <p className="text-xs text-navy-700 leading-relaxed">
           {project.aiSummary || '아직 집계된 요약이 없습니다.'}
         </p>
-        {project.feedbackComment && (
-          <p className="text-[11px] text-amber-700 mt-2 pt-2 border-t border-surface-100">
-            💬 팀장 피드백: {project.feedbackComment}
-          </p>
-        )}
       </div>
 
       <div>
@@ -102,30 +85,11 @@ export default function WeeklyTimelineCard({ project, onApprove, onRequestFeedba
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
             {days.map((d, i) => (
-              <DayCard key={`${d?.day ?? i}-${d?.date ?? i}`} day={d ?? {}} />
+              <DayCard key={`${d?.day ?? i}-${d?.date ?? i}`} day={d ?? {}} onClick={() => onOpenDay?.(d?.isoDate)} />
             ))}
           </div>
         )}
       </div>
-
-      {(onApprove || onRequestFeedback) && (
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={handleRequestFeedback}
-            disabled={busy}
-            className="px-3 py-1.5 rounded-lg border border-surface-200 text-xs font-semibold hover:bg-surface-100 disabled:opacity-50"
-          >
-            피드백 남기기
-          </button>
-          <button
-            onClick={handleApprove}
-            disabled={busy || isApproved}
-            className="px-3 py-1.5 rounded-lg bg-primary-500 text-white text-xs font-semibold hover:bg-primary-600 disabled:opacity-50 disabled:bg-surface-300 disabled:text-navy-500"
-          >
-            {isApproved ? '✓ 승인됨' : '승인'}
-          </button>
-        </div>
-      )}
     </div>
   );
 }
