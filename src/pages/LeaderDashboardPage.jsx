@@ -4,6 +4,7 @@ import KPICard from '../components/KPICard';
 import MemberAccordionCard from '../components/MemberAccordionCard';
 import WorkloadAnalysisCard from '../components/WorkloadAnalysisCard';
 import KeyTakeawaysCard from '../components/KeyTakeawaysCard';
+import LeaderReadOnlyDetailModal from '../components/LeaderReadOnlyDetailModal';
 import { deriveWorkloadAnalysis, deriveKeyTakeaways } from '../lib/insights';
 
 export default function LeaderDashboardPage() {
@@ -20,8 +21,7 @@ export default function LeaderDashboardPage() {
   const loading = useAppStore((s) => s.leaderLoading);
   const error = useAppStore((s) => s.leaderError);
   const fetchLeaderReport = useAppStore((s) => s.fetchLeaderReport);
-  const approveProject = useAppStore((s) => s.approveProject);
-  const requestFeedbackOnProject = useAppStore((s) => s.requestFeedbackOnProject);
+  const openLeaderDayDetail = useAppStore((s) => s.openLeaderDayDetail);
   const projects = useAppStore((s) => s.projects);
 
   useEffect(() => {
@@ -34,16 +34,6 @@ export default function LeaderDashboardPage() {
   const workProjects = projects.filter((p) => !p.nonWork);
   const workloadItems = deriveWorkloadAnalysis(leaderMembers);
   const keyTakeaways = deriveKeyTakeaways(leaderMembers);
-
-  async function handleApprove(weeklySummaryId) {
-    const res = await approveProject(weeklySummaryId);
-    if (!res.ok) alert(res.message ?? '승인에 실패했습니다.');
-  }
-
-  async function handleRequestFeedback(weeklySummaryId, comment) {
-    const res = await requestFeedbackOnProject(weeklySummaryId, comment);
-    if (!res.ok) alert(res.message ?? '피드백 등록에 실패했습니다.');
-  }
 
   return (
     <section>
@@ -144,15 +134,12 @@ export default function LeaderDashboardPage() {
       ) : (
         <div className="space-y-3">
           {filteredMembers.map((m) => (
-            <MemberAccordionCard
-              key={m.id}
-              member={m}
-              onApproveProject={handleApprove}
-              onRequestFeedback={handleRequestFeedback}
-            />
+            <MemberAccordionCard key={m.id} member={m} onOpenDay={openLeaderDayDetail} />
           ))}
         </div>
       )}
+
+      <LeaderReadOnlyDetailModal />
     </section>
   );
 }

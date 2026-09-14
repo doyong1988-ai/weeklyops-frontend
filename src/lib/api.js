@@ -233,7 +233,17 @@ export async function fetchLeaderWeeklyReport(weekStart) {
       aiSummary: p.aiSummary,
       feedbackStatus: p.feedbackStatus,
       feedbackComment: p.feedbackComment,
-      days: (p.days ?? []).map((d) => ({ ...formatDayLabel(d.date), progress: d.progress ?? 0, summary: d.summary ?? '' })),
+      days: (p.days ?? []).map((d) => ({
+        ...formatDayLabel(d.date),
+        isoDate: d.date,
+        progress: d.progress ?? 0,
+        slots: (d.slots ?? []).map((s) => ({
+          startTime: s.startTime,
+          endTime: s.endTime,
+          summary: s.summary ?? '',
+          progress: s.progress ?? 0,
+        })),
+      })),
     })),
   }));
 
@@ -249,4 +259,30 @@ export async function reviewProject(weeklySummaryId, status, comment) {
     return { result: null, error: { message: message || friendlyError(error) } };
   }
   return { result: data, error: null };
+}
+
+// 팀장이 팀원의 특정 날짜 타임시트를 "조회만" 할 때 쓰는 읽기 전용 쿼리.
+// fetchOrCreateTimesheet과 달리 빈 슬롯을 새로 만들지 않습니다 — 팀장이 다른
+// 사람의 타임시트에 행을 새로 끼워넣을 이유가 없기 때문입니다.
+export async function fetchDailyEntriesReadOnly(userId, entryDate) {
+  const { data, error } = await supabase
+    .from('daily_log_entries')
+    .select('id, start_time, end_time, summary, progress, status, projects(name, is_work)')
+    .eq('user_id', userId)
+    .eq('entry_date', entryDate)
+    .order('start_time');
+
+  if (error) return { rows: [], error };
+
+  return {
+    rows: (data ?? []).map((r) => ({
+      id: r.id,
+      time: `${r.start_time?.slice(0, 5)}-${r.end_time?.slice(0, 5)}`,
+      projectName: r.projects?.name ?? null,
+      summary: r.summary ?? '',
+      progress: r.progress ?? 0,
+      status: r.status,
+    })),
+    error: null,
+  };
 }

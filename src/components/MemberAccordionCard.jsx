@@ -1,7 +1,7 @@
 import useAppStore from '../store/useAppStore';
 import WeeklyTimelineCard from './WeeklyTimelineCard';
 
-export default function MemberAccordionCard({ member, onApproveProject, onRequestFeedback }) {
+export default function MemberAccordionCard({ member, onOpenDay }) {
   const isExpanded = useAppStore((s) => s.expandedMemberIds.includes(member?.id));
   const toggleExpanded = useAppStore((s) => s.toggleMemberExpanded);
 
@@ -67,8 +67,7 @@ export default function MemberAccordionCard({ member, onApproveProject, onReques
               <WeeklyTimelineCard
                 key={project?.weeklySummaryId ?? project?.projectId ?? i}
                 project={project}
-                onApprove={onApproveProject}
-                onRequestFeedback={onRequestFeedback}
+                onOpenDay={(date) => date && onOpenDay?.(member.id, name, date)}
               />
             ))
           )}

@@ -439,6 +439,43 @@ const useAppStore = create(
         get().reviewProject(weeklySummaryId, 'feedback_requested', comment),
 
       // ------------------------------------------------------------------
+      // 팀장 전용 — 팀원의 특정 날짜 타임시트를 "조회만" 하는 읽기 전용 패널.
+      // (팀원 본인이 보는 TimesheetDetailModal과 달리 수정이 불가능합니다.)
+      // ------------------------------------------------------------------
+      leaderDayDetail: { open: false, memberName: '', date: null, rows: [], loading: false, error: null },
+
+      openLeaderDayDetail: async (memberId, memberName, dateStr) => {
+        set({ leaderDayDetail: { open: true, memberName, date: dateStr, rows: [], loading: true, error: null } });
+        if (!isSupabaseConfigured) {
+          // 데모 모드: 오늘자 목업 타임시트를 그대로 보여준다.
+          const demoRows = INITIAL_TIMESHEET_ROWS.filter((r) => r.summary).map((r) => ({
+            id: r.id,
+            time: r.time,
+            projectName: get().projects.find((p) => p.id === r.projectId)?.name ?? null,
+            summary: r.summary,
+            progress: r.progress,
+          }));
+          set((state) => ({ leaderDayDetail: { ...state.leaderDayDetail, rows: demoRows, loading: false } }));
+          return;
+        }
+        const { rows, error } = await api.fetchDailyEntriesReadOnly(memberId, dateStr);
+        set((state) => {
+          if (state.leaderDayDetail.date !== dateStr) return {}; // 그 사이 다른 날짜를 열었으면 무시
+          return {
+            leaderDayDetail: {
+              ...state.leaderDayDetail,
+              rows,
+              loading: false,
+              error: error ? api.friendlyError(error) : null,
+            },
+          };
+        });
+      },
+
+      closeLeaderDayDetail: () =>
+        set({ leaderDayDetail: { open: false, memberName: '', date: null, rows: [], loading: false, error: null } }),
+
+      // ------------------------------------------------------------------
       // TIMESHEET (Daily Log)
       // ------------------------------------------------------------------
       timesheetDate: new Date().toISOString().slice(0, 10), // 오늘 날짜 (YYYY-MM-DD)
