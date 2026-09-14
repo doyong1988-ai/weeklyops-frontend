@@ -1,13 +1,18 @@
 import { useEffect } from 'react';
 import useAppStore from '../store/useAppStore';
 import TimesheetRow from '../components/TimesheetRow';
+import CalendarDatePicker from '../components/CalendarDatePicker';
 
 export default function DailyLogPage() {
   const rows = useAppStore((s) => s.timesheetRows);
   const projects = useAppStore((s) => s.projects);
   const loading = useAppStore((s) => s.timesheetLoading);
   const error = useAppStore((s) => s.timesheetError);
+  const timesheetDate = useAppStore((s) => s.timesheetDate);
   const fetchTimesheet = useAppStore((s) => s.fetchTimesheet);
+  const setTimesheetDate = useAppStore((s) => s.setTimesheetDate);
+  const goToPrevTimesheetDay = useAppStore((s) => s.goToPrevTimesheetDay);
+  const goToNextTimesheetDay = useAppStore((s) => s.goToNextTimesheetDay);
   const updateRow = useAppStore((s) => s.updateTimesheetRow);
   const setRowProjectByName = useAppStore((s) => s.setRowProjectByName);
   const submitDailyReport = useAppStore((s) => s.submitDailyReport);
@@ -16,6 +21,8 @@ export default function DailyLogPage() {
     fetchTimesheet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const isToday = timesheetDate === new Date().toISOString().slice(0, 10);
 
   async function handleSubmit() {
     const res = await submitDailyReport();
@@ -28,10 +35,12 @@ export default function DailyLogPage() {
 
   return (
     <section>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-navy-900">일일 업무 입력 (Daily Log)</h2>
-          <p className="text-sm text-navy-500 mt-1">시간 단위로 오늘 수행한 업무를 기록하세요 (09:00 ~ 18:00)</p>
+          <p className="text-sm text-navy-500 mt-1">
+            시간 단위로 수행한 업무를 기록하세요 (09:00 ~ 18:00){!isToday && ' · 오늘이 아닌 날짜를 조회 중입니다'}
+          </p>
         </div>
         <div className="flex gap-2 shrink-0">
           <button className="px-4 py-2 rounded-lg border border-surface-200 text-sm font-semibold hover:bg-surface-100">
@@ -44,6 +53,33 @@ export default function DailyLogPage() {
             일일 보고 제출
           </button>
         </div>
+      </div>
+
+      {/* 날짜 이동: 캘린더로 임의의 과거/미래 날짜 선택 + 하루씩 이동 */}
+      <div className="flex items-center gap-2 mb-5">
+        <button
+          onClick={goToPrevTimesheetDay}
+          className="w-9 h-9 flex items-center justify-center rounded-lg border border-surface-200 bg-white text-navy-500 hover:bg-surface-50"
+          aria-label="전날"
+        >
+          ◂
+        </button>
+        <CalendarDatePicker value={timesheetDate} onChange={setTimesheetDate} />
+        <button
+          onClick={goToNextTimesheetDay}
+          className="w-9 h-9 flex items-center justify-center rounded-lg border border-surface-200 bg-white text-navy-500 hover:bg-surface-50"
+          aria-label="다음날"
+        >
+          ▸
+        </button>
+        {!isToday && (
+          <button
+            onClick={() => setTimesheetDate(new Date().toISOString().slice(0, 10))}
+            className="px-3 py-2 rounded-lg text-xs font-semibold text-primary-600 hover:bg-primary-50"
+          >
+            오늘로 이동
+          </button>
+        )}
       </div>
 
       {error && (

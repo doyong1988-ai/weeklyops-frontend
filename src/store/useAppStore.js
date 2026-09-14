@@ -467,6 +467,11 @@ const useAppStore = create(
         });
       },
 
+      // 캘린더에서 임의의 날짜(과거/미래)를 골랐을 때 그날의 타임시트로 전환.
+      setTimesheetDate: (dateStr) => get().fetchTimesheet(dateStr),
+      goToPrevTimesheetDay: () => get().fetchTimesheet(shiftDate(get().timesheetDate, -1)),
+      goToNextTimesheetDay: () => get().fetchTimesheet(shiftDate(get().timesheetDate, 1)),
+
       // 팀원이 프로젝트명을 직접 타이핑했을 때: 기존 프로젝트와 이름이 같으면
       // 그 프로젝트로 연결하고, 없으면 새 프로젝트를 즉석에서 만들어 연결한다.
       setRowProjectByName: async (rowId, rawName) => {

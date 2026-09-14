@@ -17,7 +17,7 @@ function formatTodayKorean() {
 }
 
 function pageTitleFor(pathname) {
-  if (pathname === '/timesheet') return `타임시트 작성 · ${formatTodayKorean()}`;
+  if (pathname === '/timesheet') return '타임시트 작성';
   if (pathname === '/dashboard') return '내 대시보드';
   if (pathname === '/team') return '팀 대시보드';
   return 'WeeklyOps';

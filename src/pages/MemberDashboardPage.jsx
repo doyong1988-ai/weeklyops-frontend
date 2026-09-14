@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import useAppStore from '../store/useAppStore';
 import KPICard from '../components/KPICard';
 import ProjectAllocationChart from '../components/ProjectAllocationChart';
 import TimesheetDetailModal from '../components/TimesheetDetailModal';
+import CalendarDatePicker from '../components/CalendarDatePicker';
 
 const PALETTE = ['#4F46E5', '#A599F8', '#DDD9FD', '#E2E8F0', '#C4BEFB', '#94A3B8'];
 
@@ -13,6 +14,8 @@ const VIEW_MODES = [
 ];
 
 export default function MemberDashboardPage() {
+  const [pickedDate, setPickedDate] = useState(new Date().toISOString().slice(0, 10));
+
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);
 
@@ -23,7 +26,6 @@ export default function MemberDashboardPage() {
   const memberWeekStart = useAppStore((s) => s.memberWeekStart);
   const goToPrevMemberWeek = useAppStore((s) => s.goToPrevMemberWeek);
   const goToNextMemberWeek = useAppStore((s) => s.goToNextMemberWeek);
-  const getMemberWeekDays = useAppStore((s) => s.getMemberWeekDays);
 
   const selectedDay = useAppStore((s) => s.selectedDay);
   const goToPrevDay = useAppStore((s) => s.goToPrevDay);
@@ -50,8 +52,6 @@ export default function MemberDashboardPage() {
     barColor: PALETTE[i % PALETTE.length],
   }));
 
-  const weekDays = getMemberWeekDays();
-  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <section>
@@ -143,24 +143,14 @@ export default function MemberDashboardPage() {
             <span className="text-xs text-navy-400 hidden sm:inline">선택한 기간에 작성된 항목만 표시</span>
           </div>
 
-          {/* 일자 선택 칩 — 클릭하면 그 날짜의 타임시트를 바로 열어 조회/수정 */}
-          <div className="flex flex-wrap gap-2">
-            {weekDays.map((d) => (
-              <button
-                key={d.date}
-                onClick={() => openTimesheetDetail(d.date)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                  d.date === today
-                    ? 'border-primary-500 bg-primary-50 text-primary-600'
-                    : 'border-surface-200 text-navy-600 hover:bg-surface-100'
-                }`}
-                title="클릭해서 이 날짜의 타임시트 보기/수정"
-              >
-                {d.label} {d.shortDate}
-                {d.date === today && ' · 오늘'}
-              </button>
-            ))}
-          </div>
+          {/* 일자 선택 캘린더 — 날짜를 고르면 그 날짜의 타임시트를 바로 열어 조회/수정 */}
+          <CalendarDatePicker
+            value={pickedDate}
+            onChange={(dateStr) => {
+              setPickedDate(dateStr);
+              openTimesheetDetail(dateStr);
+            }}
+          />
         </div>
 
         <div className="hidden md:flex px-5 py-2.5 bg-surface-100 text-xs font-semibold text-navy-500 gap-4">
