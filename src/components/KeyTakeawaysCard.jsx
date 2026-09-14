@@ -1,4 +1,4 @@
-export default function KeyTakeawaysCard({ items }) {
+export default function KeyTakeawaysCard({ items = [] }) {
   return (
     <div className="rounded-2xl border border-surface-200 bg-white p-5 flex-1">
       <p className="font-bold text-sm text-navy-900 mb-1">주요 이슈 및 시사점 (Key Takeaways)</p>

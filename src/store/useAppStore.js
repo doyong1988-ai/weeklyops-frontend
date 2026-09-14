@@ -159,32 +159,92 @@ const useAppStore = create(
       getCurrentWeekStart: () => get().weekId,
 
       // ------------------------------------------------------------------
-      // MEMBER DASHBOARD — 년/월 필터 (동적 프로젝트 목록)
+      // MEMBER DASHBOARD — 월/주/일 뷰 전환 + 동적 프로젝트 목록
       // ------------------------------------------------------------------
+      viewMode: 'month', // 'month' | 'week' | 'day'
+      setViewMode: (mode) => {
+        set({ viewMode: mode });
+        get().fetchMemberPeriodReport();
+      },
+
       selectedMonth: new Date().toISOString().slice(0, 7), // 오늘 기준 YYYY-MM
       setSelectedMonth: (monthStr) => {
         set({ selectedMonth: monthStr });
-        get().fetchMemberMonthlyReport();
+        get().fetchMemberPeriodReport();
       },
       goToPrevMonth: () => {
         const [y, m] = get().selectedMonth.split('-').map(Number);
         const d = new Date(y, m - 2, 1); // m is 1-indexed; -2 = go back one month
         set({ selectedMonth: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` });
-        get().fetchMemberMonthlyReport();
+        get().fetchMemberPeriodReport();
       },
       goToNextMonth: () => {
         const [y, m] = get().selectedMonth.split('-').map(Number);
         const d = new Date(y, m, 1); // m is 1-indexed; this = next month
         set({ selectedMonth: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` });
-        get().fetchMemberMonthlyReport();
+        get().fetchMemberPeriodReport();
       },
       getSelectedMonthLabel: () => monthLabel(get().selectedMonth),
+
+      // 날짜 선택 칩(월~금)에 쓰이는 "이번 주" 기준점 — 리더 대시보드의 weekId와는
+      // 별개 상태입니다 (서로 다른 화면이 서로 다른 주를 보고 있어도 섞이지 않게).
+      memberWeekStart: mondayOf(new Date()),
+      goToPrevMemberWeek: () => {
+        const next = shiftDate(get().memberWeekStart, -7);
+        set({ memberWeekStart: next });
+        if (get().viewMode === 'week') get().fetchMemberPeriodReport();
+      },
+      goToNextMemberWeek: () => {
+        const next = shiftDate(get().memberWeekStart, 7);
+        set({ memberWeekStart: next });
+        if (get().viewMode === 'week') get().fetchMemberPeriodReport();
+      },
+      getMemberWeekDays: () => {
+        const start = get().memberWeekStart;
+        const KR = ['월', '화', '수', '목', '금'];
+        return KR.map((label, i) => {
+          const date = shiftDate(start, i);
+          const d = new Date(`${date}T00:00:00`);
+          return { label, date, shortDate: `${d.getMonth() + 1}/${d.getDate()}` };
+        });
+      },
+
+      selectedDay: new Date().toISOString().slice(0, 10), // '일' 뷰에서 보는 날짜
+      setSelectedDay: (dateStr) => {
+        set({ selectedDay: dateStr });
+        if (get().viewMode === 'day') get().fetchMemberPeriodReport();
+      },
+      goToPrevDay: () => {
+        set({ selectedDay: shiftDate(get().selectedDay, -1) });
+        if (get().viewMode === 'day') get().fetchMemberPeriodReport();
+      },
+      goToNextDay: () => {
+        set({ selectedDay: shiftDate(get().selectedDay, 1) });
+        if (get().viewMode === 'day') get().fetchMemberPeriodReport();
+      },
+
+      // 현재 viewMode에 맞는 조회 기간을 계산 (RPC는 start/end 날짜 범위만 받으므로
+      // month/week/day 모두 같은 RPC를 그대로 재사용할 수 있습니다).
+      getPeriodRange: () => {
+        const mode = get().viewMode;
+        if (mode === 'week') {
+          const start = get().memberWeekStart;
+          return { start, end: shiftDate(start, 4), label: formatWeekLabel(start) };
+        }
+        if (mode === 'day') {
+          const day = get().selectedDay;
+          const d = new Date(`${day}T00:00:00`);
+          return { start: day, end: day, label: `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일` };
+        }
+        const { start, end } = monthRange(get().selectedMonth);
+        return { start, end, label: monthLabel(get().selectedMonth) };
+      },
 
       memberMonthlyReport: null,
       memberMonthlyLoading: false,
       memberMonthlyError: null,
 
-      fetchMemberMonthlyReport: async () => {
+      fetchMemberPeriodReport: async () => {
         set({ memberMonthlyLoading: true, memberMonthlyError: null });
         if (!isSupabaseConfigured) {
           set({ memberMonthlyReport: MEMBER_MONTHLY_MOCK, memberMonthlyLoading: false });
@@ -195,13 +255,104 @@ const useAppStore = create(
           set({ memberMonthlyLoading: false });
           return;
         }
-        const { start, end } = monthRange(get().selectedMonth);
+        const { start, end } = get().getPeriodRange();
         const { report, error } = await api.fetchMemberMonthlyProjects(userId, start, end);
         set({
-          memberMonthlyReport: error ? get().memberMonthlyReport : report,
+          memberMonthlyReport: error ? null : report,
           memberMonthlyError: error ? api.friendlyError(error) : null,
           memberMonthlyLoading: false,
         });
+      },
+      // 이전 이름 유지 (다른 코드에서 이 이름으로 호출해도 그대로 동작하도록)
+      fetchMemberMonthlyReport: async () => get().fetchMemberPeriodReport(),
+
+      // ------------------------------------------------------------------
+      // 타임시트 상세 조회/수정 모달 — 내 대시보드에서 임의의 날짜를 골라
+      // 그날의 타임시트를 열어보고 바로 수정할 수 있게 해주는 모달 상태.
+      // (오늘자 타임시트를 다루는 timesheetRows/timesheetDate와는 별개입니다.)
+      // ------------------------------------------------------------------
+      timesheetDetail: { open: false, date: null, rows: [], loading: false, error: null },
+
+      openTimesheetDetail: async (dateStr) => {
+        set({ timesheetDetail: { open: true, date: dateStr, rows: [], loading: true, error: null } });
+        if (!isSupabaseConfigured) {
+          // 데모 모드: 오늘자 목업 데이터를 그대로 보여준다 (날짜 상관없이).
+          set((state) => ({
+            timesheetDetail: { ...state.timesheetDetail, rows: state.timesheetRows, loading: false },
+          }));
+          return;
+        }
+        const userId = get().currentUserId;
+        if (!userId) {
+          set((state) => ({ timesheetDetail: { ...state.timesheetDetail, loading: false, error: '로그인이 필요합니다.' } }));
+          return;
+        }
+        const { rows, error } = await api.fetchOrCreateTimesheet(userId, dateStr);
+        set((state) => {
+          if (state.timesheetDetail.date !== dateStr) return {}; // 그 사이 다른 날짜로 바뀌었으면 무시
+          return {
+            timesheetDetail: {
+              ...state.timesheetDetail,
+              rows: error ? [] : rows.map(dbRowToStoreRow),
+              loading: false,
+              error: error ? api.friendlyError(error) : null,
+            },
+          };
+        });
+      },
+
+      closeTimesheetDetail: () =>
+        set({ timesheetDetail: { open: false, date: null, rows: [], loading: false, error: null } }),
+
+      updateTimesheetDetailRow: async (rowId, patch) => {
+        set((state) => ({
+          timesheetDetail: {
+            ...state.timesheetDetail,
+            rows: state.timesheetDetail.rows.map((r) => (r.id === rowId ? { ...r, ...patch } : r)),
+          },
+        }));
+        if (!isSupabaseConfigured) return;
+
+        const dbPatch = {};
+        if ('projectId' in patch) dbPatch.project_id = patch.projectId || null;
+        if ('summary' in patch) dbPatch.summary = patch.summary;
+        if ('progress' in patch) dbPatch.progress = patch.progress;
+
+        const { error } = await api.updateTimesheetRow(rowId, dbPatch);
+        if (error) {
+          set((state) => ({
+            timesheetDetail: { ...state.timesheetDetail, error: api.friendlyError(error) },
+          }));
+        }
+      },
+
+      setDetailRowProjectByName: async (rowId, rawName) => {
+        const name = rawName.trim();
+        if (!name) {
+          get().updateTimesheetDetailRow(rowId, { projectId: '' });
+          return;
+        }
+        const existing = get().projects.find((p) => p.name.toLowerCase() === name.toLowerCase());
+        if (existing) {
+          get().updateTimesheetDetailRow(rowId, {
+            projectId: existing.id,
+            ...(existing.nonWork ? { summary: '', progress: 0 } : {}),
+          });
+          return;
+        }
+        if (!isSupabaseConfigured) {
+          const localProject = { id: `local-${Date.now()}`, name, color: '', barColor: '#94A3B8', nonWork: false };
+          set((state) => ({ projects: [...state.projects, localProject] }));
+          get().updateTimesheetDetailRow(rowId, { projectId: localProject.id });
+          return;
+        }
+        const { project, error } = await api.createProject(name);
+        if (error || !project) {
+          set((state) => ({ timesheetDetail: { ...state.timesheetDetail, error: api.friendlyError(error) || '프로젝트를 만들지 못했습니다.' } }));
+          return;
+        }
+        set((state) => ({ projects: [...state.projects, project] }));
+        get().updateTimesheetDetailRow(rowId, { projectId: project.id });
       },
 
       // ------------------------------------------------------------------
@@ -236,13 +387,17 @@ const useAppStore = create(
       getFilteredMembers: () => {
         const { projectId, memberId, search } = get().filters;
         const term = search.trim().toLowerCase();
-        return get()
-          .leaderMembers.filter((m) => memberId === 'all' || m.id === memberId)
-          .filter((m) => !term || m.name.toLowerCase().includes(term))
-          .map((m) => ({
-            ...m,
-            projects: projectId === 'all' ? m.projects : m.projects.filter((p) => p.projectId === projectId),
-          }))
+        const members = Array.isArray(get().leaderMembers) ? get().leaderMembers : [];
+        return members
+          .filter((m) => memberId === 'all' || m?.id === memberId)
+          .filter((m) => !term || (m?.name ?? '').toLowerCase().includes(term))
+          .map((m) => {
+            const projects = Array.isArray(m?.projects) ? m.projects : [];
+            return {
+              ...m,
+              projects: projectId === 'all' ? projects : projects.filter((p) => p?.projectId === projectId),
+            };
+          })
           .filter((m) => projectId === 'all' || m.projects.length > 0 || m.status === '미작성');
       },
 
@@ -434,9 +589,22 @@ const useAppStore = create(
     }),
     {
       name: 'weeklyops-store', // localStorage key — fine in production, see note above
+      version: 2, // bumped because weekId's format changed from 'YYYY-Wnn' to a date string
+      migrate: (persistedState, fromVersion) => {
+        if (fromVersion < 2 && persistedState && typeof persistedState === 'object') {
+          // Old weekId values like '2026-W37' are no longer valid dates and were
+          // crashing the leader dashboard (SQL "invalid input syntax for type date").
+          // Drop it so the store falls back to its fresh, date-relative default.
+          const { weekId, ...rest } = persistedState;
+          return rest;
+        }
+        return persistedState;
+      },
       partialize: (state) => ({
         role: state.role,
-        weekId: state.weekId,
+        // weekId / selectedMonth are intentionally NOT persisted — they should
+        // always default to whatever "today" actually is on each visit, not a
+        // value saved from a previous day (see the date-bug fixes above).
         expandedMemberIds: state.expandedMemberIds,
       }),
     }

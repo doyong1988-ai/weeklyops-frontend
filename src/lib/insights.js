@@ -3,14 +3,20 @@
 // 아니라 이 파일의 규칙 기반 로직으로 계산됩니다. 나중에 AI를 켜면, 이 두 함수
 // 대신 weekly_summaries.ai_summary 등을 모아 Claude를 호출하는 새 Edge Function
 // (예: analyze-team-week)으로 교체하는 것을 권장합니다.
+//
+// 두 함수 모두 members/projects가 null·undefined·빈 배열이어도 절대 던지지
+// 않도록 방어적으로 작성되어 있습니다 (백엔드 응답이 불완전해도 화면이 깨지지
+// 않게 하기 위함).
 
 // 팀원별로 이번 주 가장 비중이 높았던 프로젝트 1건을 뽑는다.
 export function deriveWorkloadAnalysis(members) {
+  if (!Array.isArray(members)) return [];
+
   return members
-    .filter((m) => m.projects.length > 0)
+    .filter((m) => Array.isArray(m?.projects) && m.projects.length > 0)
     .map((m) => {
-      const top = [...m.projects].sort((a, b) => (b.share ?? 0) - (a.share ?? 0))[0];
-      return { name: m.name, projectName: top?.name ?? '-', share: top?.share ?? 0 };
+      const top = [...m.projects].sort((a, b) => (b?.share ?? 0) - (a?.share ?? 0))[0];
+      return { name: m.name ?? '이름 없음', projectName: top?.name ?? '-', share: top?.share ?? 0 };
     });
 }
 
@@ -19,28 +25,37 @@ export function deriveWorkloadAnalysis(members) {
 //  - 한 명이 60% 이상 투입비중을 차지하는 프로젝트 → "리소스 집중 위험"
 //  - 팀장이 피드백을 남겼지만 아직 재작성되지 않은 항목 → "피드백 반영 필요"
 export function deriveKeyTakeaways(members) {
+  if (!Array.isArray(members)) return [];
+
   const issues = [];
   for (const m of members) {
-    for (const p of m.projects) {
-      if ((p.overall ?? 0) < 30) {
+    const projects = Array.isArray(m?.projects) ? m.projects : [];
+    for (const p of projects) {
+      if (!p) continue;
+      const overall = p.overall ?? 0;
+      const share = p.share ?? 0;
+      const projectName = p.name ?? '이름 없는 프로젝트';
+      const memberName = m.name ?? '이름 없음';
+
+      if (overall > 0 && overall < 30) {
         issues.push({
           level: 'high',
-          project: p.name,
-          text: `${m.name}님 담당 — 전체 진행률 ${p.overall}%로 낮은 편입니다. 병목 원인 확인이 필요합니다.`,
+          project: projectName,
+          text: `${memberName}님 담당 — 전체 진행률 ${overall}%로 낮은 편입니다. 병목 원인 확인이 필요합니다.`,
         });
       }
-      if ((p.share ?? 0) >= 60) {
+      if (share >= 60) {
         issues.push({
           level: 'medium',
-          project: p.name,
-          text: `${m.name}님의 투입 비중이 ${p.share}%로 높습니다. 리소스 집중에 따른 일정 리스크를 확인해주세요.`,
+          project: projectName,
+          text: `${memberName}님의 투입 비중이 ${share}%로 높습니다. 리소스 집중에 따른 일정 리스크를 확인해주세요.`,
         });
       }
       if (p.feedbackStatus === 'feedback_requested') {
         issues.push({
           level: 'medium',
-          project: p.name,
-          text: `${m.name}님에게 피드백을 남겼습니다: "${p.feedbackComment ?? ''}" — 반영 여부 확인이 필요합니다.`,
+          project: projectName,
+          text: `${memberName}님에게 피드백을 남겼습니다: "${p.feedbackComment ?? ''}" — 반영 여부 확인이 필요합니다.`,
         });
       }
     }

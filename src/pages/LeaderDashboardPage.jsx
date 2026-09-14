@@ -15,7 +15,8 @@ export default function LeaderDashboardPage() {
   const filters = useAppStore((s) => s.filters);
   const setFilter = useAppStore((s) => s.setFilter);
   const getFilteredMembers = useAppStore((s) => s.getFilteredMembers);
-  const leaderMembers = useAppStore((s) => s.leaderMembers);
+  const leaderMembersRaw = useAppStore((s) => s.leaderMembers);
+  const leaderMembers = Array.isArray(leaderMembersRaw) ? leaderMembersRaw : [];
   const loading = useAppStore((s) => s.leaderLoading);
   const error = useAppStore((s) => s.leaderError);
   const fetchLeaderReport = useAppStore((s) => s.fetchLeaderReport);
@@ -119,7 +120,10 @@ export default function LeaderDashboardPage() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <KPICard label="제출 현황" value={`${leaderMembers.length - unsubmitted.length} / ${leaderMembers.length || '-'}명`} />
+        <KPICard
+          label="제출 현황"
+          value={leaderMembers.length > 0 ? `${leaderMembers.length - unsubmitted.length} / ${leaderMembers.length}명` : '- / -명'}
+        />
         <KPICard label="팀 평균 진행률" value="64%" sub="전주 대비 +4%p" subTone="positive" />
         <KPICard label="진행 중 프로젝트" value={`${workProjects.length}개`} />
         <KPICard label="이번 주 총 근무시간" value={`${leaderMembers.reduce((sum, m) => sum + (m.hours || 0), 0)}h`} />

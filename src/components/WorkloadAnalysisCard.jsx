@@ -1,4 +1,4 @@
-export default function WorkloadAnalysisCard({ items }) {
+export default function WorkloadAnalysisCard({ items = [] }) {
   return (
     <div className="rounded-2xl bg-navy-800 text-white p-5 flex-1">
       <p className="font-bold text-sm mb-1">팀원별 주요 업무 비중 분석</p>
