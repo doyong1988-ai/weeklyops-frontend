@@ -138,3 +138,4 @@ Zustand의 `persist`는 `role`, `weekId`, `selectedMonth`, `expandedMemberIds`�
 씁니다. **이건 전부 실제 배포 환경에서 정상 동작합니다** — Claude.ai의 인앱 미리보기
 아티팩트 샌드박스에서만 `localStorage`가 막혀 있고, 이 프로젝트는 Vite로 직접
 빌드/배포하는 일반 React 앱이라 제약이 없습니다.
+.
