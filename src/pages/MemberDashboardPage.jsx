@@ -4,6 +4,7 @@ import KPICard from '../components/KPICard';
 import ProjectAllocationChart from '../components/ProjectAllocationChart';
 import TimesheetDetailModal from '../components/TimesheetDetailModal';
 import CalendarDatePicker from '../components/CalendarDatePicker';
+import { todayLocalDateStr } from '../lib/dateUtils';
 
 const PALETTE = ['#4F46E5', '#A599F8', '#DDD9FD', '#E2E8F0', '#C4BEFB', '#94A3B8'];
 
@@ -14,7 +15,7 @@ const VIEW_MODES = [
 ];
 
 export default function MemberDashboardPage() {
-  const [pickedDate, setPickedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [pickedDate, setPickedDate] = useState(todayLocalDateStr());
 
   const viewMode = useAppStore((s) => s.viewMode);
   const setViewMode = useAppStore((s) => s.setViewMode);

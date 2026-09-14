@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { todayLocalDateStr } from '../lib/dateUtils';
 
 const WEEKDAYS_KR = ['일', '월', '화', '수', '목', '금', '토'];
 
@@ -46,7 +47,7 @@ export default function CalendarDatePicker({ value, onChange, label }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocalDateStr();
   const cells = buildMonthGrid(viewYear, viewMonth);
 
   function goPrevMonth() {

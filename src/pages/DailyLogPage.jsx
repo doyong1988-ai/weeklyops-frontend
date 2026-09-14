@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import useAppStore from '../store/useAppStore';
 import TimesheetRow from '../components/TimesheetRow';
 import CalendarDatePicker from '../components/CalendarDatePicker';
+import { todayLocalDateStr } from '../lib/dateUtils';
 
 export default function DailyLogPage() {
   const rows = useAppStore((s) => s.timesheetRows);
@@ -22,7 +23,7 @@ export default function DailyLogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isToday = timesheetDate === new Date().toISOString().slice(0, 10);
+  const isToday = timesheetDate === todayLocalDateStr();
 
   async function handleSubmit() {
     const res = await submitDailyReport();
@@ -74,7 +75,7 @@ export default function DailyLogPage() {
         </button>
         {!isToday && (
           <button
-            onClick={() => setTimesheetDate(new Date().toISOString().slice(0, 10))}
+            onClick={() => setTimesheetDate(todayLocalDateStr())}
             className="px-3 py-2 rounded-lg text-xs font-semibold text-primary-600 hover:bg-primary-50"
           >
             오늘로 이동

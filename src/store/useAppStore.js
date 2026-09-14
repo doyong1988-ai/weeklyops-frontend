@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PROJECTS, INITIAL_TIMESHEET_ROWS, TEAM_MEMBERS, MEMBER_MONTHLY_MOCK, mockGenerateAISuggestion } from '../data/mockData';
 import { isSupabaseConfigured, isAIEnabled, setRememberPreference } from '../lib/supabaseClient';
+import { toLocalDateStr, todayLocalDateStr, todayLocalMonthStr } from '../lib/dateUtils';
 import * as api from '../lib/api';
 
 // Supabase Auth error messages are in English and shouldn't leak to the UI
@@ -20,7 +21,7 @@ function monthLabel(monthStr) {
 function monthRange(monthStr) {
   const [y, m] = monthStr.split('-').map(Number);
   const start = `${monthStr}-01`;
-  const end = new Date(y, m, 0).toISOString().slice(0, 10); // last day of month
+  const end = toLocalDateStr(new Date(y, m, 0)); // last day of month
   return { start, end };
 }
 
@@ -28,17 +29,22 @@ function monthRange(monthStr) {
 // Matches Postgres's date_trunc('week', ...) convention used on the backend,
 // and is always computed relative to whatever "today" really is — no
 // hardcoded dates that go stale.
+//
+// IMPORTANT: these must never format dates via .toISOString() — that
+// converts to UTC, which silently shifts the date backward by a day for
+// anyone in a timezone ahead of UTC (Korea included). Always use
+// toLocalDateStr() instead, which reads the local calendar date directly.
 function mondayOf(date) {
   const d = new Date(date);
   const day = d.getDay(); // 0=Sun ... 6=Sat
   const diff = day === 0 ? -6 : 1 - day;
   d.setDate(d.getDate() + diff);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 function shiftDate(dateStr, days) {
   const d = new Date(`${dateStr}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toLocalDateStr(d);
 }
 function formatWeekLabel(mondayStr) {
   const monday = new Date(`${mondayStr}T00:00:00`);
@@ -167,7 +173,7 @@ const useAppStore = create(
         get().fetchMemberPeriodReport();
       },
 
-      selectedMonth: new Date().toISOString().slice(0, 7), // 오늘 기준 YYYY-MM
+      selectedMonth: todayLocalMonthStr(), // 오늘 기준 YYYY-MM
       setSelectedMonth: (monthStr) => {
         set({ selectedMonth: monthStr });
         get().fetchMemberPeriodReport();
@@ -209,7 +215,7 @@ const useAppStore = create(
         });
       },
 
-      selectedDay: new Date().toISOString().slice(0, 10), // '일' 뷰에서 보는 날짜
+      selectedDay: todayLocalDateStr(), // '일' 뷰에서 보는 날짜
       setSelectedDay: (dateStr) => {
         set({ selectedDay: dateStr });
         if (get().viewMode === 'day') get().fetchMemberPeriodReport();
@@ -478,7 +484,7 @@ const useAppStore = create(
       // ------------------------------------------------------------------
       // TIMESHEET (Daily Log)
       // ------------------------------------------------------------------
-      timesheetDate: new Date().toISOString().slice(0, 10), // 오늘 날짜 (YYYY-MM-DD)
+      timesheetDate: todayLocalDateStr(), // 오늘 날짜 (YYYY-MM-DD)
       timesheetRows: INITIAL_TIMESHEET_ROWS,
       timesheetLoading: false,
       timesheetError: null,
